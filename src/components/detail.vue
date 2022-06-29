@@ -44,7 +44,11 @@
 
         <el-form style="border-right: 4px #f6f6f6 solid;padding-right: 5px;margin-right: 5px;width: 950px;"
                  label-width="100px"
-                 label-position="left">
+                 label-position="left"
+                 :rules="chooseRoomRules"
+                 ref="chooseRoomForm"
+                 v-model="chooseRoom"
+        >
 
           <el-form-item label="房间类型">
 
@@ -58,7 +62,7 @@
             </el-select>
           </el-form-item>
 
-          <el-form-item label="房号">
+          <el-form-item label="房号" prop="chooseRoomValue">
             <el-select
                 v-model="chooseRoom.chooseRoomValue"
                 value-key="id"
@@ -74,6 +78,7 @@
                   :key="item.value"
                   :label="item.label"
                   :value="item.value"
+                  :disabled="item.disable"
               />
             </el-select>
           </el-form-item>
@@ -111,13 +116,14 @@
                 v-model="chooseRoom.time"
                 type="date"
                 placeholder="入店日期"
+                :disabled-date="disabledDate"
             />
           </el-form-item>
           <el-form-item label="入住天数">
             <!--            <el-input v-model="chooseRoom.checkInDays" style="width: 150px" placeholder="预计入住天数"/>-->
             <el-input-number style="width: 80px;" v-model="chooseRoom.checkInDays" :controls="false"/>
           </el-form-item>
-          <el-form-item label="价格">
+          <el-form-item label="押金">
             <el-input disabled style="width: 80px" :placeholder="chooseRoom.price+ ' 元'"/>
           </el-form-item>
 
@@ -126,7 +132,7 @@
           </el-form-item>
           <el-form-item>
             <el-button @click="resetChooseRoom()">重置</el-button>
-            <el-button type="primary" @click="onsubmitChooseRoom()">确认</el-button>
+            <el-button type="primary" @click="onsubmitChooseRoom(chooseRoomForm)">确认</el-button>
           </el-form-item>
         </el-form>
 
@@ -210,7 +216,7 @@
         <el-table-column prop="realname" label="入住人" width="150"/>
         <el-table-column prop="checkInDays" label="预计入住天数"/>
         <el-table-column prop="time" label="入住时间"/>
-        <el-table-column prop="roomprice" label="房间单价"/>
+        <el-table-column prop="roomdeposit" label="房间押金"/>
         <el-table-column prop="price" label="价钱"/>
       </el-table>
       <template #footer>
@@ -232,6 +238,8 @@ import roomAPI from "@/api/room";
 import cookie from "@/utils/cookie";
 import realUserAPI from "@/api/realUser";
 import orderAPI from "@/api/order";
+import {reactive} from "vue";
+import FormRules from 'element-plus'
 
 export default {
   name: "detail",
@@ -326,10 +334,13 @@ export default {
           label: '女'
         },
       ],
-      dialogVisible_submitOrder: false
+      dialogVisible_submitOrder: false,
+
     }
-  },
+  }
+  ,
   methods: {
+
     showChooseRoom(type) {
       if (!cookie.getTokenByName("user")) {
         this.$router.push('/login')
@@ -339,7 +350,6 @@ export default {
         userId: cookie.getTokenByName("userId")
       }
       realUserAPI.findRealPage(query_).then(res => {
-        console.log(res.data)
         this.chooseRoom.realInfo.length = res.data.length
         for (let i = 0; i < res.data.length; i++) {
           let realUser = res.data[i]
@@ -348,9 +358,7 @@ export default {
             label: realUser.realname
           }
         }
-        console.log(this.chooseRoom.realInfo)
       })
-
 
       //寻找空闲的房间
       //TODO: 寻找空闲的房间,使用存储过程
@@ -359,7 +367,6 @@ export default {
         roomtype: type
       }
       roomAPI.findAllRoomsByStatusAndType(query).then(res => {
-        console.log(res.data)
         this.chooseRoom.chooseTypeValue = type
         this.chooseRoom.roomNumber.length = res.data.length
         for (let i = 0; i < res.data.length; i++) {
@@ -371,17 +378,23 @@ export default {
       })
       this.dialogVisible = true
 
-    },
+    }
+    ,
     //改变人数
     updateChooseRealUser() {
       this.chooseRoom.peopleNumber = this.chooseRoom.chooseRealInfoValue.length
-    },
+    }
+    ,
     //  改变价钱
     updatePrice() {
-      this.chooseRoom.price = this.chooseRoom.chooseRoomValue.roomprice
-    },
-    //提交选择
+      this.chooseRoom.price = this.chooseRoom.chooseRoomValue.roomdeposit
+    }
+    ,
+    //提交选择的房间到订单中
     onsubmitChooseRoom() {
+      if (!this.validateChooseRoomForm()) {
+        return
+      }
       let realname = ""
       for (let i = 0; i < this.chooseRoom.chooseRealInfoValue.length; i++) {
         realname += " " + this.chooseRoom.chooseRealInfoValue[i].realname
@@ -391,6 +404,7 @@ export default {
         roomnumber: this.chooseRoom.chooseRoomValue.roomnumber,
         roomtype: this.chooseRoom.chooseTypeValue,
         roomprice: this.chooseRoom.chooseRoomValue.roomprice,
+        roomdeposit: this.chooseRoom.chooseRoomValue.roomdeposit,
         peoplenumber: this.chooseRoom.peopleNumber,
         checkInDays: this.chooseRoom.checkInDays,
         time: this.formatDate(this.chooseRoom.time),
@@ -401,7 +415,8 @@ export default {
       }
       this.hasChosenRoom.push(chooseInfo)
       this.resetChooseRoom()
-    },
+    }
+    ,
     //  重置表单chooseRoom
     resetChooseRoom() {
       this.chooseRoom.chooseTypeValue = ''
@@ -410,18 +425,22 @@ export default {
       this.chooseRoom.peopleNumber = 0
       this.chooseRoom.time = ""
       this.chooseRoom.price = 0
+      this.chooseRoom.checkInDays = 1
       this.chooseRoom.remark = ""
-    },
+    }
+    ,
     //  重置表单hasChosenRoom
     resetHasChosenRoom() {
       this.hasChosenRoom.length = 0
-    },
+    }
+    ,
     // 取消
     onCancelTable() {
       this.resetHasChosenRoom()
       this.resetChooseRoom()
       this.dialogVisible = false
-    },
+    }
+    ,
     //重置表单addRealUserData
     resetAddRealUserData() {
       this.addRealUserData.realname = ""
@@ -429,25 +448,35 @@ export default {
       this.addRealUserData.phone = ""
       this.addRealUserData.age = null
       this.addRealUserData.gender = ""
-    },
+      this.addRealUserData.id = null
+    }
+    ,
+    //取消添加实名信息
     cancelAddRealUser() {
       this.resetAddRealUserData()
       this.dialogVisible_AddRealInfo = false
-    },
+    }
+    ,
+    //添加实名信息
     submitAddRealUser() {
+      if (!this.validateAddRealUserForm()) {
+        return
+      }
       realUserAPI.addRealUser(this.addRealUserData).then(res => {
-        this.addRealUserData.id = res.data
-        let data = {
-          value: this.addRealUserData,
-          label: this.addRealUserData.realname
-        }
-        this.chooseRoom.realInfo.push(data)
-        this.chooseRoom.chooseRealInfoValue.length = this.chooseRoom.chooseRealInfoValue.length + 1
-        this.chooseRoom.chooseRealInfoValue.push(this.addRealUserData)
+        this.addRealUserData.id = res.data.id
+        this.chooseRoom.realInfo.push({
+          value: res.data,
+          label: res.data.realname
+        })
+        this.chooseRoom.chooseRealInfoValue.push(res.data)
+        this.updateChooseRealUser()
+        // this.chooseRoom.realInfo.push(data)
+        // this.chooseRoom.chooseRealInfoValue.length = this.chooseRoom.chooseRealInfoValue.length + 1
         this.dialogVisible_AddRealInfo = false
         this.resetAddRealUserData()
       })
-    },
+    }
+    ,
     //提交订单
     submitOrder() {
       //处理数据
@@ -457,9 +486,8 @@ export default {
           return total + item.peoplenumber
         }, 0),
         orderstatus: "已支付未入住",
-        totalprice: this.hasChosenRoom.reduce((total, item) => {
-          return total + item.price
-        }, 0),
+        totalprice: 0,
+        hotelid: 1,
         totaldeposit: this.hasChosenRoom.reduce((total, item) => {
           return total + item.room.roomdeposit
         }, 0),
@@ -498,7 +526,8 @@ export default {
         })
 
       })
-    },
+    }
+    ,
     //格式化日期
     formatDate(date) {
       let year = date.getFullYear()
@@ -506,29 +535,184 @@ export default {
       let day = date.getDate()
       return year + "-" + month + "-" + day
     }
-  },
-  watch: {
-    //  监听选择房间的天数
-    'chooseRoom.checkInDays': function (val) {
-      this.chooseRoom.price = this.chooseRoom.chooseRoomValue.roomprice * val
+    ,
+
+    //禁止选择次日之前的日期
+    disabledDate(time) {
+      return time.getTime() < Date.now() - 8.64e7
     },
-    //  监听选择房间的类型
-    'chooseRoom.chooseTypeValue': function (val) {
-      let query = {
-        roomstatus: "空闲",
-        roomtype: val
+
+    //验证身份证号码
+    validateIdentityNumber(identityNumber) {
+      let reg = /(^\d{15}$)|(^\d{18}$)|(^\d{17}(\d|X|x)$)/
+      return reg.test(identityNumber)
+    },
+    //验证手机号码
+    validatePhone(phone) {
+      let reg = /^1[3456789]\d{9}$/
+      return reg.test(phone)
+    },
+
+    //表单验证
+    validateChooseRoomForm() {
+      if (this.chooseRoom.chooseRoomValue == null || this.chooseRoom.chooseRoomValue == '') {
+        this.$message({
+          message: "请选择房间",
+          type: "warning"
+        })
+        return false
       }
-      roomAPI.findAllRoomsByStatusAndType(query).then(res => {
-        this.chooseRoom.roomNumber.length = res.data.length
-        this.chooseRoom.chooseRoomValue = ""
-        for (let i = 0; i < res.data.length; i++) {
-          this.chooseRoom.roomNumber[i] = {
-            value: res.data[i],
-            label: res.data[i].roomnumber,
+      if (this.chooseRoom.peopleNumber == null || this.chooseRoom.peopleNumber == 0) {
+        this.$message({
+          message: "请选择入住人",
+          type: "warning"
+        })
+        return false
+      } else {
+        if (this.chooseRoom.chooseTypeValue === '单人间') {
+          if (this.chooseRoom.peopleNumber > 1) {
+            this.$message({
+              message: "单人间最多只能入住一个人",
+              type: "warning"
+            })
+            return false
+          }
+        } else if (this.chooseRoom.chooseTypeValue === '双人间') {
+          if (this.chooseRoom.peopleNumber > 2) {
+            this.$message({
+              message: "双人间最多只能入住两个人",
+              type: "warning"
+            })
+            return false
+          }
+        } else if (this.chooseRoom.chooseTypeValue === '三人间') {
+          if (this.chooseRoom.peopleNumber > 3) {
+            this.$message({
+              message: "三人间最多只能入住三个人",
+              type: "warning"
+            })
+            return false
+          }
+        } else if (this.chooseRoom.chooseTypeValue === '四人间') {
+          if (this.chooseRoom.peopleNumber > 4) {
+            this.$message({
+              message: "四人间最多只能入住四个人",
+              type: "warning"
+            })
+            return false
           }
         }
-      })
+      }
+      if (this.chooseRoom.time == null || this.chooseRoom.time == '') {
+        this.$message({
+          message: "请选择入住时间",
+          type: "warning"
+        })
+        return false
+      }
+      return true
+    },
+    validateAddRealUserForm() {
+      if (this.addRealUserData.realname == null || this.addRealUserData.realname == '') {
+        this.$message({
+          message: "请输入真实姓名",
+          type: "warning"
+        })
+        return false
+      }
+      if (this.addRealUserData.gender == null || this.addRealUserData.gender == '') {
+        this.$message({
+          message: "请选择性别",
+          type: "warning"
+        })
+        return false
+      }
+      if (this.addRealUserData.age == null || this.addRealUserData.age < 0 || this.addRealUserData.age > 150) {
+        this.$message({
+          message: "请输入正确的年龄",
+          type: "warning"
+        })
+        return false
+      }
+      if (this.addRealUserData.identificationnumber == null || this.addRealUserData.identificationnumber == '') {
+        this.$message({
+          message: "请输入身份证号码",
+          type: "warning"
+        })
+        return false
+      } else {
+        if (!this.validateIdentityNumber(this.addRealUserData.identificationnumber)) {
+          this.$message({
+            message: "请输入正确的身份证号码",
+            type: "warning"
+          })
+          return false
+        }
+      }
+      if (this.addRealUserData.phone == null || this.addRealUserData.phone == '') {
+        this.$message({
+          message: "请输入手机号码",
+          type: "warning"
+        })
+        return false
+      } else {
+        if (!this.validatePhone(this.addRealUserData.phone)) {
+          this.$message({
+            message: "请输入正确的手机号码",
+            type: "warning"
+          })
+          return false
+        }
+      }
+      return true
+
+
     }
+  }
+  ,
+  watch: {
+    //  监听选择房间的天数
+    'chooseRoom.checkInDays':
+
+        function (val) {
+          this.chooseRoom.price = this.chooseRoom.chooseRoomValue.roomdeposit * val
+        }
+
+    ,
+    //  监听选择房间的类型
+    'chooseRoom.chooseTypeValue':
+        function (val) {
+          let query = {
+            roomstatus: "空闲",
+            roomtype: val
+          }
+          roomAPI.findAllRoomsByStatusAndType(query).then(res => {
+            this.chooseRoom.roomNumber.length = res.data.length
+            this.chooseRoom.chooseRoomValue = ""
+            for (let i = 0; i < res.data.length; i++) {
+              var flag = false
+              for (let j = 0; j < this.hasChosenRoom.length; j++) {
+                if (res.data[i].roomnumber === this.hasChosenRoom[j].roomnumber) {
+                  flag = true
+                }
+              }
+              if (flag) {
+                this.chooseRoom.roomNumber[i] = {
+                  value: res.data[i],
+                  label: res.data[i].roomnumber,
+                  disable: true
+                }
+              } else {
+                this.chooseRoom.roomNumber[i] = {
+                  value: res.data[i],
+                  label: res.data[i].roomnumber,
+                }
+              }
+              flag = false
+
+            }
+          })
+        }
   }
 
 }

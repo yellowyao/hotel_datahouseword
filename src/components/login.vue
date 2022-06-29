@@ -34,7 +34,7 @@ export default {
   data() {
     return {
       user: {
-        email: "369770384@qq.com",
+        email: "369770383@qq.com",
         password: "123456",
       },
     };
@@ -48,11 +48,11 @@ export default {
     },
     login() {
       userApi.login(this.user).then(res => {
-        console.log(res.data)
         cookie.setTokenByName("user", res.data.user)
         cookie.setTokenByName("userName", res.data.user.name)
         cookie.setTokenByName("userUrl", res.data.user.avatar)
         cookie.setTokenByName("userId", res.data.user.id)
+        cookie.setTokenByName("userVip", res.data.user.vip)
         this.$router.go(-1)
       })
     }

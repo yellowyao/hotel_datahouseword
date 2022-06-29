@@ -1,20 +1,19 @@
 <template>
   <div class="header ">
     <el-row>
-      <el-col :offset="1" :span="5">
+      <el-col :offset="1" :span="8">
         <div class="centerAndFlex">
           <el-avatar :size="50"
                      src="https://thecomputer-1308737201.cos.ap-shanghai.myqcloud.com/UserAvatar/10759616-a3aa-4032-bd4f-5cebe1c8c2f3.png"/>
-          <span class="title" @click="$router.push('/')"> 上电力国际连锁酒店</span>
+          <span class="title" @click="$router.push('/')"> 上电力国际连锁酒店(临港总店)</span>
         </div>
       </el-col>
-      <el-col :offset="14" :span="3">
+      <el-col :offset="10" :span="4">
 
 
         <div v-if="isLogin" class="centerAndFlex ">
           <el-avatar :size="50"
                      :src="user.url"/>
-
           <el-popover
               v-model:visible="visible"
               placement="bottom"
@@ -33,13 +32,8 @@
           </el-popover>
 
 
-          <!--            <div v-if="showOperate" class="operate">-->
-          <!--              <el-icon style="margin-bottom: 5px">-->
-          <!--                <ArrowUp/>-->
-          <!--              </el-icon>-->
-          <!--              <el-button>主页信息</el-button>-->
-          <!--              <el-button>退出</el-button>-->
-          <!--            </div>-->
+          <el-tag class="ml-2" style="margin-left: 10px;" type="success">VIP {{ parseInt(user.vip / 100) }}</el-tag>
+
 
         </div>
         <div v-else class="centerAndFlex">
@@ -61,7 +55,8 @@ export default {
       isLogin: false,
       user: {
         name: "",
-        url: ""
+        url: "",
+        vip: 0,
       }
     }
   },
@@ -70,6 +65,7 @@ export default {
       this.isLogin = true
       this.user.name = cookie.getTokenByName("userName")
       this.user.url = cookie.getTokenByName("userUrl")
+      this.user.vip = cookie.getTokenByName("userVip")
     }
   },
   methods: {
